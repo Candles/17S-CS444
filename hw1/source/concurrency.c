@@ -1,3 +1,11 @@
+//======================================================//
+//Spring 2017 CS-444									//
+//Assignment #1											//
+//Concurrency											//
+//														//
+//By Chongxian Chen, Thomas Olson and Christopher Tang	//
+//======================================================//
+
 #include "stdio.h"
 #include "pthread.h"
 #include "unistd.h"
@@ -20,6 +28,8 @@ void *producer(void*);
 int rdrand_support();
 unsigned long rand_long();
 
+
+//Mutex globals
 pthread_mutex_t buffer_mutex;
 pthread_cond_t cond_empty;
 pthread_cond_t cond_full;
@@ -61,7 +71,8 @@ int main( int argc, char *argv[]){
 		printf("Usage: %s -c <consumer_threads> -p <producer_threads>\n", argv[0]);
 		exit(EXIT_FAILURE);
 	}
-	
+
+	//Seed the generator if we're not using RDRAND
 	if (!rdrand_support()){
 		init_genrand(time(NULL));
 	}
@@ -103,7 +114,7 @@ void *consumer(void *args){
 		//REMOVE JOB
 		Work job = jobs[--jobs_count];
 
-		//Broadcast to blocked threads that there's space in the buffer
+		//If we just cleared space in a full buffer, let the blocked producers know
 		if(jobs_count == NUM_JOBS - 1){
 			pthread_cond_broadcast(&cond_full);
 		}
@@ -123,8 +134,8 @@ void *producer(void *args){
 
 		//CREATE WORK
 		Work job;
-		job.value = rand() % 10;
-		job.time = rand() % 7 + 2;
+		job.value = rand_long() % 1024;
+		job.time = rand_long() % 7 + 2;
 
 		//LOCK BUFFER
 		pthread_mutex_lock(&buffer_mutex);
@@ -137,7 +148,7 @@ void *producer(void *args){
 		//ADD WORK
 		jobs[jobs_count++] = job;
 
-		//If we just added a job, broadcast to all blocked threads that there's work
+		//If we just added a job to an empty buffer, let the blocked consumers know
 		if(jobs_count == 1){
 			pthread_cond_broadcast(&cond_empty);
 		}
@@ -145,7 +156,7 @@ void *producer(void *args){
 		//UNLOCK BUFFER
 		pthread_mutex_unlock(&buffer_mutex);
 
-		sleep(rand() % 5 + 3);
+		sleep(rand_long() % 5 + 3);
 	}
 }
 
