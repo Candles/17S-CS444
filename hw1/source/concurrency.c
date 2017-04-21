@@ -1,27 +1,32 @@
-#include <stdio.h>
-#include <pthread.h>
-#include <unistd.h>
-#include <time.h>
-#include <stdlib.h>
-#include <getopt.h>
+#include "stdio.h"
+#include "pthread.h"
+#include "unistd.h"
+#include "time.h"
+#include "stdlib.h"
+#include "getopt.h"
+#include "mt19937ar.c"
 
 #define NUM_CONSUMERS 5
 #define NUM_PRODUCERS 5
 #define NUM_JOBS 32
 
+typedef struct Work {
+	int value, time;
+} Work;
+
+void *consumer(void*);
+void *producer(void*);
+
+int rdrand_support();
+unsigned long rand_long();
 
 pthread_mutex_t buffer_mutex;
 pthread_cond_t cond_empty;
 pthread_cond_t cond_full;
 
-typedef struct Work {
-	int value, time;
-} Work;
-
 Work jobs[NUM_JOBS];
 int jobs_count;
-void *consumer(void*);
-void *producer(void*);
+
 
 int main( int argc, char *argv[]){
 
@@ -57,8 +62,9 @@ int main( int argc, char *argv[]){
 		exit(EXIT_FAILURE);
 	}
 	
-
-	srand(time(NULL));
+	if (!rdrand_support()){
+		init_genrand(time(NULL));
+	}
 
 	pthread_t cons_ids[num_consumers];
 	pthread_t prod_ids[num_producers];
@@ -114,11 +120,11 @@ void *consumer(void *args){
 
 void *producer(void *args){
 	while(1){
+
 		//CREATE WORK
 		Work job;
 		job.value = rand() % 10;
 		job.time = rand() % 7 + 2;
-
 
 		//LOCK BUFFER
 		pthread_mutex_lock(&buffer_mutex);
@@ -130,8 +136,6 @@ void *producer(void *args){
 
 		//ADD WORK
 		jobs[jobs_count++] = job;
-
-
 
 		//If we just added a job, broadcast to all blocked threads that there's work
 		if(jobs_count == 1){
@@ -145,17 +149,37 @@ void *producer(void *args){
 	}
 }
 
-/*
-int rand(){
-	int val, success;
+int rdrand_support(){
+	int eax, ebx, ecx, edx;
+	
+	__asm__ volatile(
+		"cpuid"
+		: "=a" (eax),
+		  "=b" (ebx),
+		  "=c" (ecx),
+		  "=d" (edx)
+		: "a" (1), "c" (0)
+	);
+	
+	return (ecx & (1 << 30));
+}
 
-	do{
-		asm (
-			"rdrand %0; setc %1"
-			: "=r" (val), "=g" (success)
-		);
-	} while(!success);
+unsigned long rand_long(){
+	unsigned long val;
 
+	if (rdrand_support()){
+	
+		int success = 0;
+	
+		do {
+			__asm__ (
+				"rdrand %0; setc %1"
+				: "=r" (val), "=m" (success)
+			);
+		} while(!success);
+	} else {
+		val = genrand_int32();
+	}
+	
 	return val;
 }
-*/
