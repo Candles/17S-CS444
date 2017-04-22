@@ -11,12 +11,12 @@
 \usepackage{url}
 
 \usepackage{balance}
-\usepackage[TABBOTCAP, tight]{subfigure}
 \usepackage{enumitem}
-\usepackage{pstricks, pst-node}
 
 \usepackage{geometry}
 \geometry{textheight=8.5in, textwidth=6in}
+
+\usepackage{longtable}
 
 %random comment
 
@@ -55,16 +55,16 @@ By Thomas Olson, Christopher Tang, Chongxian Chen
 
 \section{Command logs}
 \
-\par First we login to our os-server by logging into our filp server first then "ssh os-class"
+\par First we login to our os-server by logging into our lflp server first then "ssh os-class"
 \par mkdir /scratch/spring2017/14-03
 \par cd /scratch/spring2017/14-03
-\par git clone git://git.yoctoproject.org/linux-yocto-3.14
+\par git cloneï¿½git://git.yoctoproject.org/linux-yocto-3.14
 \par cd linux-yocto-3.14
 \par git checkout v3.14.26
 \par We are using Tcsh, so we ran "source /scratch/opt/environment-setup-i586-poky-linux.csh"
 \par cp /scratch/spring2017/files/config-3.14.26-yocto-qemu .config
 \par make menuconfig
-\par press / and type in LOCALVERSION, press enter. 
+\par press / and type in LOCALVERSION, press enter.ï¿½
 \par Hit 1, press enter and then edit the value to be -14-03-hw1
 \par make -j4 all
 \par cd ..
@@ -78,7 +78,7 @@ By Thomas Olson, Christopher Tang, Chongxian Chen
 \par login as root
 \par uname -a
 \par reboot
-\par qemu-system-i386 -gdb tcp::5643 -S -nographic -kernel linux-yocto-3.14/arch/x86/boot/bzImage  -drive file=core-image-lsb-sdk-qemux86.ext3,if=virtio -enable-kvm -net none -usb -localtime --no-reboot --append "root=/dev/vda rw console=ttyS0 debug"
+\par qemu-system-i386 -gdb tcp::5643 -S -nographic -kernel linux-yocto-3.14/arch/x86/boot/bzImageï¿½ -drive file=core-image-lsb-sdk-qemux86.ext3,if=virtio -enable-kvm -net none -usb -localtime --no-reboot --append "root=/dev/vda rw console=ttyS0 debug"
 \par iin gdb, target remote :5643
 \par continue
 \par login as root
@@ -86,7 +86,148 @@ By Thomas Olson, Christopher Tang, Chongxian Chen
 \par reboot
 \par q to quit gdb
 
+\section{Concurrency Writeup}
+For our concurrency assignment, we opted for using a mutex on the main buffer and two condition variables for when the buffer is entirely empty and entirely full. The mutex ensures that no two threads can modify the objects in the buffer or the count of the objects in the buffer at the same time, preventing any race conditions from arising. Once condition variable causes the consumers to block if the job buffer is empty, and the other condition variable causes the producers to block if the job buffer is full. The main thread reads the command-line arguments, seeds the Mersenne Twister if rdrand support is not available, initializes the mutex and condition variables, generates the threads and then enters an infinite loop where it just sleeps. Consumers lock the buffer, block and unlock if the job buffer is empty, remove a job, broadcast to producers if they made free space in a full buffer, unlock the buffer and finally process the job. Producers create a job, lock the buffer, block and unlock if the buffer is full, add the job to the buffer, broadcast to consumers if they added a job to an empty buffer, unlock the buffer and finally sleep. Random number generation is done using rdrand if it is supported, and the Mersenne Twister if it is not.
 
-\section{Qemu Flags}
+
+\section{QEMU Flags}
+\subsection{-gdb tcp::????}
+Waits for a connection from gdb on TCP port ????.
+
+\subsection{-S}
+Don't start the CPU in QEMU at startup.
+
+\subsection{-nographic}
+Disables graphic output.
+
+\subsection{-kernel bzImage-qemux86.bin}
+Use bzImage-qemux86.bin as the kernel image.
+
+\subsection{-drive file=core-image-lsb-sdk-qemux86.ext3,if=virtio}
+Defines a drive with core-image-lsb-sdk-qemux86.ext3 as the disk image and virtio as the interface.
+
+\subsection{-enable-kvm}
+Enables KVM support.
+
+\subsection{-net none}
+Prevents QEMU from configuring network devices.
+
+\subsection{-usb}
+Enables USB support.
+
+\subsection{-localtime}
+Specifies the real-time clock to start with local time as its base.
+
+\subsection{--no-reboot}
+Exit QEMU instead of rebooting on reboot.
+
+\subsection{--append "root=/dev/vda rw console=ttyS0 debug"}
+Appends "root=/dev/vda rw console=ttyS0 debug" to the kernel boot command-line parameters.
+
+\section{Concurrency Questions}
+\subsection{}
+We think that the main point of this assignment is to ease our way into parallel programming. Even in the context of single-core uniprocessor systems, understanding the concepts of race conditions and mutual exclusion becomes important when working with processes that may need to share resources and can be context-switched, even when dealing with something as relatively simple as file IO.
+
+\subsection{}
+First we blocked out the main sections of code. We knew that we'd need a main function, a function for consumers, and a function for producers. We also knew we'd need a mutex for the buffer, a struct for jobs, and array for the job buffer. Then we divided the worker functions into the main parts: creating/processing the job, locking the buffer, adding/removing the job, and unlocking the buffer. We used the stdlib rand() for testing purposes until we knew that the concurrency part worked fine. We then opted to use a condition variable for blocking producers when the buffer was full and consumers when it was empty. Once we had that all down, we added the boilerplate for creating and initializing the mutex, condition variables and threads. The next step was to replace the stdlib rand() with a custom rand\_long() function that used rdrand and the Mersenne Twister to generate the random values for the code. Finally, we added the support for command-line arguments.
+
+\subsection{}
+First we tested the concurrency until we were certain it worked, then we tested the rand\_long() function on its own. For the concurrency, we felt it passed as long as the output was both sufficiently random, the program did not deadlock, and it did not run into any errors when the buffer was particularly full or empty. We tested the code with a roughly equal number of producers and consumers, significantly more producers than consumers, and significantly more consumers than producers. For the rand\_long() function, we tested it in a virtual machine running Linux and on the engineering server by simply calling it multiple times in a loop and seeing that the output was sufficiently random.
+
+\subsection{}
+We learned how to write GCC-style in-line assembly, how to use mutex locks to ensure data integrity and how to use condition variables to restrict threads based off the value of a variable.
+
+\section{Git Log}
+%% This file was generated by the script latex-git-log
+\begin{tabular}{lp{12cm}}
+  \label{tabular:legend:git-log}
+  \textbf{acronym} & \textbf{meaning} \\
+  V & \texttt{version} \\
+  tag & \texttt{git tag} \\
+  MF & Number of \texttt{modified files}. \\
+  AL & Number of \texttt{added lines}. \\
+  DL & Number of \texttt{deleted lines}. \\
+\end{tabular}
+
+\bigskip
+
+\begin{longtable}{|rlllrrr|}
+\hline \multicolumn{1}{|c}{\textbf{V}} & \multicolumn{1}{c}{\textbf{tag}}
+& \multicolumn{1}{c}{\textbf{date}}
+& \multicolumn{1}{c}{\textbf{commit message}} & \multicolumn{1}{c}{\textbf{MF}}
+& \multicolumn{1}{c}{\textbf{AL}} & \multicolumn{1}{c|}{\textbf{DL}} \\ \hline
+\endhead
+
+\endfoot
+
+\hline% \hline
+\endlastfoot
+
+\hline 1 &  & 2017-04-19 & Initial commit & 2 & 35 & 0 \\
+\hline 2 &  & 2017-04-19 & Initial commit of first assignment & 1 & 118 & 0 \\
+\hline 3 &  & 2017-04-19 & Fixed compilation errors; added command-line argument support & 1 & 78 & 35 \\
+\hline 4 &  & 2017-04-21 & Added Mersenne Twister file & 1 & 172 & 0 \\
+\hline 5 &  & 2017-04-21 & Added rdrand and Mersenne Twister support & 1 & 52 & 28 \\
+\hline 6 &  & 2017-04-21 & Added some comments and fixed calling the wrong rand() & 1 & 17 & 6 \\
+\hline 7 &  & 2017-04-21 & add write up tex & 3 & 220 & 0 \\
+\hline 8 &  & 2017-04-21 & Added makefile for concurrency code & 1 & 2 & 0 \\
+\end{longtable}
+
+\section{Work Log}
+
+\subsection{April 14th}
+Wrote most of the concurrency code and did the first half of the kernel assignment
+
+\subsection{April 19th}
+Met as a group to divide up the remainder of the work. Thomas took the rest of the concurrency assignment and the documentation for it. Christopher and Chongxian finished the kernel assignment and took the rest of the documentation. Github repository created.
+
+\subsection{April 20th}
+Finished the coding portion of the concurrency assignment.
+
+\subsection{April 21st}
+Met up as a group for recitation. Christopher and Chongxian started the documentation portion of the kernal assignment. Thomas did the concurrency documentation and finished the rest of the assignment.
 
 \end{document}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

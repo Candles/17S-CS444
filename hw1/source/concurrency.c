@@ -14,8 +14,6 @@
 #include "getopt.h"
 #include "mt19937ar.c"
 
-#define NUM_CONSUMERS 5
-#define NUM_PRODUCERS 5
 #define NUM_JOBS 32
 
 typedef struct Work {
