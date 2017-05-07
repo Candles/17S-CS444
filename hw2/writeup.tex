@@ -84,6 +84,7 @@ The idea behind creating an I/O scheduler is to help students understand that a 
 \subsection{How We Approached the Problem}
 
 \subsection{How We Tested Our Solution}
+    To test our I/O solution, we created a simple program in c to generate text files filled with random numbers. These are then sudo-randomly accessed again to add more content. While the I/O scheduler adds these file to a queue, it will print out the sector number. If the output is a monotonically increasing string of numbers then we know that our solution is working.
 
 \section{Git Log}
 
