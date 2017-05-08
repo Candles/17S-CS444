@@ -1,41 +1,23 @@
-TEX=writeup
-filename=writeup
-number=2
+#
+# Makefile for the kernel block layer
+#
 
-all: pdf concurrency
+obj-$(CONFIG_BLOCK) := elevator.o blk-core.o blk-tag.o blk-sysfs.o \
+			blk-flush.o blk-settings.o blk-ioc.o blk-map.o \
+			blk-exec.o blk-merge.o blk-softirq.o blk-timeout.o \
+			blk-iopoll.o blk-lib.o blk-mq.o blk-mq-tag.o \
+			blk-mq-sysfs.o blk-mq-cpu.o blk-mq-cpumap.o ioctl.o \
+			genhd.o scsi_ioctl.o partition-generic.o partitions/
 
-pdf: ${TEX}.tex 
-	latex $(TEX).tex
-	dvips -R -Poutline -t letter ${TEX}.dvi -o ${TEX}.ps
-	ps2pdf ${TEX}.ps
+obj-$(CONFIG_BLK_DEV_BSG)	+= bsg.o
+obj-$(CONFIG_BLK_DEV_BSGLIB)	+= bsg-lib.o
+obj-$(CONFIG_BLK_CGROUP)	+= blk-cgroup.o
+obj-$(CONFIG_BLK_DEV_THROTTLING)	+= blk-throttle.o
+obj-$(CONFIG_IOSCHED_NOOP)	+= noop-iosched.o
+obj-$(CONFIG_IOSCHED_DEADLINE)	+= deadline-iosched.o
+obj-$(CONFIG_IOSCHED_CFQ)	+= cfq-iosched.o
+obj-$(CONFIG_IOSCHED_SSTF)	+= sstf-iosched.o
 
-pdf-print: ps
-	ps2pdf -dColorConversionStrategy=/LeaveColorUnchanged -dPDFSETTINGS=/printer ${filename}.ps
-
-text: html
-	html2text -width 100 -style pretty ${filename}/${filename}.html | sed -n '/./,$$p' | head -n-2 >${filename}.txt
-
-html:
-	@#latex2html -split +0 -info "" -no_navigation ${filename}
-	htlatex ${filename}
-
-ps:	dvi
-	dvips -t letter ${filename}.dvi
-
-dvi:
-	latex ${filename}
-	bibtex ${filename}||true
-	latex ${filename}
-	latex ${filename}
-
-read:
-	evince ${filename}.pdf &
-
-aread:
-	acroread ${filename}.pdf
-
-tar:
-	tar -czf CS44_project${number}_1402.tar.bz2 *
-	
-clean:
-	rm -f ${filename}.{ps,pdf,log,aux,out,dvi,bbl,blg}
+obj-$(CONFIG_BLOCK_COMPAT)	+= compat_ioctl.o
+obj-$(CONFIG_BLK_DEV_INTEGRITY)	+= blk-integrity.o
+obj-$(CONFIG_BLK_CMDLINE_PARSER)	+= cmdline-parser.o
