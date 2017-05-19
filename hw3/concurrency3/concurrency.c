@@ -40,7 +40,7 @@
 #include "unistd.h"
 #include "time.h"
 #include "stdlib.h"
-#include "list.h"
+
 #include "semaphore.h"
 
 #define MAXTHREADS  8
@@ -49,16 +49,107 @@
 #define INSERTER 	1
 #define DELETER  	2
 
-#define LIST_HEAD(listhead)
-struct list_head listhead = LIST_HEAD_INIT(listhead)
+void *wrok(void* arg);
+void search();
+void insert();
+void delete();
 
 
-typedef struct 
-{
+
+typedef struct node {
+	int 		 data;
+	struct node *next;
+} node_t;
+
+void add_tail(node_t *head, int val){
+	node_t *current = head;
+	while (current->next != NULL){
+		current = current->next;
+	}
+	current->next = malloc(sizeof(node_t));
+	current->next->data = val;
+	current->next->next = NULL;
+	list_length++;
+}
+
+/**
+ * @brief      Looks for the first node that matches val.
+ *
+ * @param      head  The head
+ * @param[in]  val   The value to match
+ *
+ * @return     Returns a pointer to the matched node.
+ */
+node_t* search_for_node(node_t *head, int val){
+	node_t *current = head;
+	while (current->val != val){
+		if (current->next != NULL){
+			current = current->next;
+		}
+		else {
+			return NULL;	
+		}
+	}
+	return current;
+}
+
+/**
+ * @brief      Removes a node at "random".
+ *
+ * @param      head  The head of the list.
+ */
+void remove_node(node_t *head){
+	node_t *current = head;
+	node_t *temp;
+	int i = 0;
+	int j = rand() % list_length;
+	for (; i < j-1; i++){
+		if (curent->next != NULL){
+			curent = curent->next;
+		}
+	}
+
+	temp = current->next;
+	current->next = temp->next;
+	free(temp);
+}
+
+/**
+ * @brief      Prints out a list.
+ *
+ * @param      head  The head of the list.
+ */
+void print_list(node_t *head){
+	node_t	*current = head;
+	while (current->next != NULL){
+		printf("%5d", current->data);
+		current = current->next;
+	}
+	printf("%5d", current->data);
+	printf("\n");
+}
+
+/**
+ * @brief      Frees the list.
+ *
+ * @param      head  The head of the list.
+ */
+void free_list(node_t *head){
+	node_t *temp = head;
+	while(head->next != NULL){
+		temp = head;
+		head = head->next;
+		free(temp);
+	}
+	free(head);
+}
+
+
+
+typedef struct {
     int counter;
     sem_t mutex;
-
-}LightSwitch;
+} LightSwitch;
 
 /**
  * @brief      Multi-thread semaphore controller - LOCK
@@ -93,6 +184,8 @@ void ls_unlock(LightSwitch *ls, sem_t* sem){
     sem_post(&ls->mut);
 }
 
+
+int list_length;
 
 sem_t insertMutex;
 sem_t noSearcher;
