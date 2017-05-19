@@ -52,7 +52,8 @@
 #define LIST_HEAD(listhead)
 struct list_head listhead = LIST_HEAD_INIT(listhead)
 
-sem_t list_lock;
+sem_t list_lock_modify; //lock if ANY changes are being made
+sem_t list_lock_delete;	//lock if you are a deleter and currently deleting
 
 
 int main( int argc, char *argv[]){
@@ -60,7 +61,8 @@ int main( int argc, char *argv[]){
 	char name[9];
 	int worker[MAXTHREADS];
 	pthread_t worker_thread[MAXTHREADS];
-	sem_init(&list_lock, 0, 0);
+	sem_init(&list_lock_modify, 0, 0);
+	sem_init(&list_lock_delete, 0, 0);
 
 	INIT_LIST_HEAD(*listhead);
 
@@ -78,7 +80,7 @@ int main( int argc, char *argv[]){
 		}
 		printf("Creating %s\n", name);
 		
-		worker[i] = rand() % 2;	// assign workers their role
+		worker[i] = rand() % 2;	// assign workers their role; not promises about there being at least one of each...
 		pthread_create(&worker_thread[i], NULL, work, (void*)worker[i]); // create workers and start them
  	}
 
@@ -90,39 +92,46 @@ int main( int argc, char *argv[]){
 }
 
 
-
-
 void *wrok(void* arg){
     int objective = *((int*)arg);
     while(1){
 		switch objective{
-			case 0:
+			case SEARCHER:
+				search();
 				break;
-			case 1:
+			case INSTER:
+				insert();
 				break;
-			case 2:
+			case DELETER:
+				delete();
 				break;		
 		}//switch
 	}//while
 }//work
 
-
+//needs a way to tell if delete is running or not
 void search(){
 	sval_t temp = 0;
 
-	sem_getvalue(list_lock, temp);
-	if (val == SEARCHER || val == INSERTER){
-		//DO SHEARCHING
-		printf("looing for a %c", letter)
-	} else {//deleter
-	       //dont search
+	if (sem_trywait(list_lock_delete) == 0){
+		printf("looking for a thing");
+	} else {		//deleter active
+	       		 	//don't search
 	}
 
 }
 
 void insert(){
-	if (sem_trylock(list_lock) == 0){
-
+	if (sem_trywait(list_lock_modify) == 0){
+		struct list_head *new = malloc(sizeof(struct list_head));
+		list_add_tail(new,listhead);
+		sem_post(list_lock_modify);
 	}
 }
 
+void delete(){
+	if (sem_trywait(list_lock_modify)){		// insert isn't inserting or another deleter isn't deleting
+		sem_wait(list_lock_delete);			// no search running
+
+	}
+}
