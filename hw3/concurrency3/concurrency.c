@@ -49,27 +49,25 @@
 #define INSERTER 	1
 #define DELETER  	2
 
-void *wrok(void* arg);
+void *work(void* arg);
 void search();
 void insert();
 void delete();
 
 
 int list_length;
-struct node_t head;
+struct node_t *head;
 
 sem_t insertMutex;
 sem_t noSearcher;
 sem_t noInserter;
 
-struct LightSwitch searchSwitch;
-struct LightSwitch insertSwitch;
 
 
 
-typedef struct node {
+typedef struct node_t {
 	int 		 data;
-	struct node *next;
+	struct node_t *next;
 } node_t;
 
 void add_tail(node_t *head, int val){
@@ -155,7 +153,7 @@ void free_list(node_t *head){
 }
 
 
-typedef struct {
+typedef struct LightSwitch {
     int counter;
     sem_t mutex;
 } LightSwitch;
@@ -191,6 +189,8 @@ void ls_unlock(LightSwitch *ls, sem_t* sem){
     sem_post(&ls->mutex);
 }
 
+struct LightSwitch searchSwitch;
+struct LightSwitch insertSwitch;
 
 
 int main( int argc, char *argv[]){
@@ -199,28 +199,28 @@ int main( int argc, char *argv[]){
 	int worker[MAXTHREADS];
 	pthread_t worker_thread[MAXTHREADS];
 	
+	head = malloc(sizeof(node_t));
+	
 	sem_init(&insertMutex, 0, 1);
 	sem_init(&noSearcher, 0, 1);
 	sem_init(&noInserter, 0, 1);
 
-
-	INIT_LIST_HEAD(*listhead);
-
 	for(;i < MAXTHREADS; i++){
-		switch worker[i] {
+		worker[i] = rand() % 2;
+		switch (worker[i]) {
 			case 0:
 				sprintf(name, "Searcher");
 				break;
-			case 0:
+			case 1:
 				sprintf(name, "Inserter");
 				break;
-			case 0:
+			case 2:
 				sprintf(name, "Deleter");
 				break;
 		}
 		printf("Creating %s\n", name);
 		
-		worker[i] = rand() % 2;	// assign workers their role; not promises about there being at least one of each...
+		//worker[i] = rand() % 2;	// assign workers their role; not promises about there being at least one of each...
 		pthread_create(&worker_thread[i], NULL, work, (void*)worker[i]); // create workers and start them
  	}
 
@@ -236,14 +236,14 @@ int main( int argc, char *argv[]){
  *
  * @param      arg   Worker objective
  */
-void *wrok(void* arg){
+void *work(void* arg){
     int objective = *((int*)arg);
     while(1){
 		switch (objective) {
 			case SEARCHER:
 				search();
 				break;
-			case INSTER:
+			case INSERTER:
 				insert();
 				break;
 			case DELETER:
@@ -260,10 +260,16 @@ void *wrok(void* arg){
 void search(){
 	int val = rand() % 9999;
 
-	ls_lock(searchSwitch, noSearcher);
+	ls_lock(&searchSwitch, &noSearcher);
 	printf("Searching for %d\n", val);
-	if (search_for_node(head, val) != NULL) ? printf("Found it!\n") : printf("Not found!\n");
-	ls_unlock(searchSwitch, noSearcher);
+	if (search_for_node(head, val) != NULL){
+		 printf("Found it!\n");
+	}
+	else{
+		 printf("Not found!\n");
+	}
+
+	ls_unlock(&searchSwitch, &noSearcher);
 }
 
 /**
@@ -271,22 +277,22 @@ void search(){
  */
 void insert(){
 	int val = rand() % 9999;
-	ls_lock(insertSwitch, noInserter);
-	sem_wait(insertMutex); 				//wait for other inserts to finish
+	ls_lock(&insertSwitch, &noInserter);
+	sem_wait(&insertMutex); 				//wait for other inserts to finish
 	printf("Inserting %d!\n", val);
 	add_tail(head, val);
-	sem_post(insertMutex);
-	ls_unlock(insertSwitch, noInserter);
+	sem_post(&insertMutex);
+	ls_unlock(&insertSwitch, &noInserter);
 }
 
 /**
  * @brief      Waits for noSearcher and noInsert before deleting.
  */
 void delete(){
-	sem_wait(noSearcher);
-	sem_wait(noInserter);
+	sem_wait(&noSearcher);
+	sem_wait(&noInserter);
 	printf("Deleting a node!\n");
 	remove_node(head);
-	sem_post(noInserter);
-	sem_post(noSearcher);
+	sem_post(&noInserter);
+	sem_post(&noSearcher);
 }
