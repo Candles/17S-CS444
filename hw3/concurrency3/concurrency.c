@@ -56,6 +56,7 @@ void delete();
 
 
 int list_length;
+struct node_t head;
 
 sem_t insertMutex;
 sem_t noSearcher;
@@ -92,7 +93,7 @@ void add_tail(node_t *head, int val){
  */
 node_t* search_for_node(node_t *head, int val){
 	node_t *current = head;
-	while (current->val != val){
+	while (current->data != val){
 		if (current->next != NULL){
 			current = current->next;
 		}
@@ -114,8 +115,8 @@ void remove_node(node_t *head){
 	int i = 0;
 	int j = rand() % list_length;
 	for (; i < j-1; i++){
-		if (curent->next != NULL){
-			curent = curent->next;
+		if (current->next != NULL){
+			current = current->next;
 		}
 	}
 
@@ -151,7 +152,6 @@ void free_list(node_t *head){
 		head = head->next;
 		free(temp);
 	}
-	free(head);
 }
 
 
@@ -188,7 +188,7 @@ void ls_unlock(LightSwitch *ls, sem_t* sem){
     if (ls->counter == 0) {
         sem_post(sem);
     }
-    sem_post(&ls->mut);
+    sem_post(&ls->mutex);
 }
 
 
@@ -239,7 +239,7 @@ int main( int argc, char *argv[]){
 void *wrok(void* arg){
     int objective = *((int*)arg);
     while(1){
-		switch objective{
+		switch (objective) {
 			case SEARCHER:
 				search();
 				break;
