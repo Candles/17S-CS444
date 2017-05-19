@@ -86,8 +86,13 @@ void add_tail(node_t *head, int val){
 	current->next = malloc(sizeof(node_t));
 	current->next->data = val;
 	current->next->next = NULL;
-	list_length++;
 	}
+	else{
+		head = malloc(sizeof(node_t));
+		head->data = val;	
+	}
+	list_length++;
+
 }
 
 /**
@@ -127,13 +132,21 @@ void remove_node(node_t *head){
 	    if (head == NULL) {
         	return;
     	}
-
-       	temp = (head)->next;
-       	free(head);
-       	head = temp;
-	list_length--;  
-*/  
-    return;
+	
+		if (head->next == NULL){
+			free(head);
+			head = NULL;
+		}
+	
+		else{
+		       	temp = (head)->next;
+	       		free(head);
+       			head = temp;
+		}
+	
+		list_length--;  
+ */
+		return;
 	}
 
 	else {
