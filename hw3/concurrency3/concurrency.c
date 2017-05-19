@@ -49,7 +49,7 @@
 #define INSERTER 	1
 #define DELETER  	2
 
-void *work(void* arg);
+void *work(void*);
 void search();
 void insert();
 void delete();
@@ -196,9 +196,8 @@ struct LightSwitch insertSwitch;
 int main( int argc, char *argv[]){
 	int i = 0;
 	char name[9];
-	int worker[MAXTHREADS];
 	pthread_t worker_thread[MAXTHREADS];
-	
+	int *workerid;
 	head = malloc(sizeof(node_t));
 	
 	sem_init(&insertMutex, 0, 1);
@@ -206,8 +205,9 @@ int main( int argc, char *argv[]){
 	sem_init(&noInserter, 0, 1);
 
 	for(;i < MAXTHREADS; i++){
-		worker[i] = rand() % 2;
-		switch (worker[i]) {
+		workerid = malloc(sizeof(int)); 
+        *workerid = rand() % 2;
+		switch (workerid) {
 			case 0:
 				sprintf(name, "Searcher");
 				break;
@@ -217,11 +217,13 @@ int main( int argc, char *argv[]){
 			case 2:
 				sprintf(name, "Deleter");
 				break;
+            default:
+                sprintf(name, "%d", workerid);
 		}
 		printf("Creating %s\n", name);
 		
 		//worker[i] = rand() % 2;	// assign workers their role; not promises about there being at least one of each...
-		pthread_create(&worker_thread[i], NULL, work, (void*)worker[i]); // create workers and start them
+		pthread_create(&worker_thread[i], NULL, work, (void*)workid); // create workers and start them
  	}
 
     while(1){ 
