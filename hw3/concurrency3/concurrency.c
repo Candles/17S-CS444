@@ -70,6 +70,13 @@ typedef struct node_t {
 	struct node_t *next;
 } node_t;
 
+
+/**
+ * @brief      Adds a new node to the tail.
+ *
+ * @param      head  The head of the list.
+ * @param[in]  val   The value to store.
+ */
 void add_tail(node_t *head, int val){
 	node_t *current = head;
 	while (current->next != NULL){
@@ -84,8 +91,8 @@ void add_tail(node_t *head, int val){
 /**
  * @brief      Looks for the first node that matches val.
  *
- * @param      head  The head
- * @param[in]  val   The value to match
+ * @param      head  The head of the list.
+ * @param[in]  val   The value to match.
  *
  * @return     Returns a pointer to the matched node.
  */
@@ -111,23 +118,21 @@ void remove_node(node_t *head){
 	node_t *current = head;
 	node_t *temp = NULL;
 	int i = 0;
-
 	int j = rand() % list_length;
 	
 	if (j == 0){
-	node_t * next_node = NULL;
-
-   	if (head == NULL) {
+	    if (head == NULL) {
         	return;
     	}
 
-   	 next_node = (head)->next;
-   	 free(head);
-   	 head = next_node;
-         return;
+       	temp = (head)->next;
+       	free(head);
+       	head = temp;
+        return;
 	}
+
 	else {
-		for (; i < j-1; i++){
+		for (; i < j; i++){
 			if (current->next != NULL){
 				current = current->next;
 			} else {
@@ -141,6 +146,7 @@ void remove_node(node_t *head){
 	}
 
 }
+
 
 /**
  * @brief      Prints out a list.
@@ -157,6 +163,7 @@ void print_list(node_t *head){
 	printf("\n");
 }
 
+
 /**
  * @brief      Frees the list.
  *
@@ -172,10 +179,12 @@ void free_list(node_t *head){
 }
 
 
+
 typedef struct LightSwitch {
     int counter;
     sem_t mutex;
 } LightSwitch;
+
 
 /**
  * @brief      Multi-thread semaphore controller - LOCK
@@ -207,6 +216,7 @@ void ls_unlock(LightSwitch *ls, sem_t* sem){
     }
     sem_post(&ls->mutex);
 }
+
 
 struct LightSwitch searchSwitch;
 struct LightSwitch insertSwitch;
@@ -244,8 +254,7 @@ int main( int argc, char *argv[]){
                 sprintf(name, "%d", workerid);
 		}
 		printf("Creating %s\n", name);
-		
-		//worker[i] = rand() % 2;	// assign workers their role; not promises about there being at least one of each...
+
 		pthread_create(&worker_thread[i], NULL, work, (void*)workerid); // create workers and start them
  	}
 
@@ -256,6 +265,7 @@ int main( int argc, char *argv[]){
     return 0;
 }
 
+
 /**
  * @brief      Directs threads to their designated functions.
  *
@@ -263,7 +273,6 @@ int main( int argc, char *argv[]){
  */
 void *work(void* arg){
     int objective = *((int*)arg);
-    printf("My number is %d\n", objective);
     while(1){
 		switch (objective) {
 			case SEARCHER:
@@ -279,6 +288,7 @@ void *work(void* arg){
 	}//while
 }//work
 
+
 /**
  * @brief      Locks the noSearcher sem with the ability to add more searchers.
  * 
@@ -287,16 +297,19 @@ void search(){
 	int val = rand() % 100;
 
 	ls_lock(&searchSwitch, &noSearcher);
-	printf("Searching for %d\n", val);
+	
+    printf("Searching for %d ", val);
 	if (search_for_node(head, val) != NULL){
 		 printf("Found it!\n");
 	}
 	else{
 		 printf("Not found!\n");
 	}
-	ls_unlock(&searchSwitch, &noSearcher);
+	
+    ls_unlock(&searchSwitch, &noSearcher);
 	sleep(rand() % 8 + 2);
 }
+
 
 /**
  * @brief      Locks noInserter sem then blocks until it can grab inserMutex.
@@ -306,12 +319,15 @@ void insert(){
 
 	ls_lock(&insertSwitch, &noInserter);
 	sem_wait(&insertMutex); 				//wait for other inserts to finish
-	printf("Inserting %d!\n", val);
+	
+    printf("Inserting %d!\n", val);
 	add_tail(head, val);
-	sem_post(&insertMutex);
+	
+    sem_post(&insertMutex);
 	ls_unlock(&insertSwitch, &noInserter);
 	sleep(rand() % 8 + 2);
 }
+
 
 /**
  * @brief      Waits for noSearcher and noInsert before deleting.
