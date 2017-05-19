@@ -43,7 +43,7 @@
 
 #include "semaphore.h"
 
-#define MAXTHREADS  8
+#define MAXTHREADS  5
 
 #define SEARCHER 	0
 #define INSERTER 	1
@@ -109,22 +109,37 @@ node_t* search_for_node(node_t *head, int val){
  */
 void remove_node(node_t *head){
 	node_t *current = head;
-	node_t *temp;
+	node_t *temp = NULL;
 	int i = 0;
-//	int j = rand() % list_length;
-/*
-	if (head->next != NULL){
+
+	int j = rand() % list_length;
+	
+	if (j == 0){
+	node_t * next_node = NULL;
+
+   	if (head == NULL) {
+        	return;
+    	}
+
+   	 next_node = (head)->next;
+   	 free(head);
+   	 head = next_node;
+         return;
+	}
+	else {
 		for (; i < j-1; i++){
 			if (current->next != NULL){
 				current = current->next;
+			} else {
+				return;
 			}
 		}
 
-		temp = current;
-		current = current->next;
+		temp = current->next;
+		current->next = temp->next;
 		free(temp);
 	}
-*/
+
 }
 
 /**
@@ -169,7 +184,6 @@ typedef struct LightSwitch {
  * @param      sem   The semaphore to be locked
  */
 void ls_lock(LightSwitch *ls, sem_t *sem){
-	printf("locking switch\n");
     sem_wait(&ls->mutex);
     ls->counter++;
     if (ls->counter == 1) {
@@ -206,12 +220,16 @@ int main( int argc, char *argv[]){
 	head = malloc(sizeof(node_t));
 	
 	sem_init(&insertMutex, 0, 1);
-	sem_init(&noSearcher, 0, 1);
-	sem_init(&noInserter, 0, 1);
+	sem_init(&noSearcher,  0, 1);
+	sem_init(&noInserter,  0, 1);
 
-	for(;i < MAXTHREADS; i++){
+	sem_init(&searchSwitch.mutex, 0, 1);
+	sem_init(&insertSwitch.mutex, 0, 1);	
+	
+
+	for(i = 0; i < MAXTHREADS; i++){
 		workerid = malloc(sizeof(int)); 
-        *workerid = i % 3;
+	        *workerid = i % 3;
 		switch (*workerid) {
 			case 0:
 				sprintf(name, "Searcher");
@@ -266,7 +284,6 @@ void *work(void* arg){
  * 
  */
 void search(){
-while(1){
 	int val = rand() % 100;
 
 	ls_lock(&searchSwitch, &noSearcher);
@@ -277,16 +294,14 @@ while(1){
 	else{
 		 printf("Not found!\n");
 	}
-
 	ls_unlock(&searchSwitch, &noSearcher);
 	sleep(rand() % 8 + 2);
-}}
+}
 
 /**
  * @brief      Locks noInserter sem then blocks until it can grab inserMutex.
  */
 void insert(){
-while(1){
 	int val = rand() % 100;
 
 	ls_lock(&insertSwitch, &noInserter);
@@ -296,18 +311,21 @@ while(1){
 	sem_post(&insertMutex);
 	ls_unlock(&insertSwitch, &noInserter);
 	sleep(rand() % 8 + 2);
-}}
+}
 
 /**
  * @brief      Waits for noSearcher and noInsert before deleting.
  */
 void delete(){
-	while(1){
+	int temp = 0;
+
 	sem_wait(&noSearcher);
 	sem_wait(&noInserter);
+
 	printf("Deleting a node!\n");
 	remove_node(head);
-	sem_post(&noSearcher);
+
 	sem_post(&noInserter);
+	sem_post(&noSearcher);
 	sleep(rand() %8 + 2);
-}}
+}
