@@ -238,6 +238,7 @@ int main( int argc, char *argv[]){
  */
 void *work(void* arg){
     int objective = *((int*)arg);
+    printf("My number is %d\n", objective);
     while(1){
 		switch (objective) {
 			case SEARCHER:
