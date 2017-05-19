@@ -55,6 +55,16 @@ void insert();
 void delete();
 
 
+int list_length;
+
+sem_t insertMutex;
+sem_t noSearcher;
+sem_t noInserter;
+
+struct LightSwitch searchSwitch;
+struct LightSwitch insertSwitch;
+
+
 
 typedef struct node {
 	int 		 data;
@@ -182,14 +192,6 @@ void ls_unlock(LightSwitch *ls, sem_t* sem){
 }
 
 
-int list_length;
-
-sem_t insertMutex;
-sem_t noSearcher;
-sem_t noInserter;
-
-struct LightSwitch searchSwitch;
-struct LightSwitch insertSwitch;
 
 int main( int argc, char *argv[]){
 	int i = 0;
@@ -262,7 +264,6 @@ void search(){
 	printf("Searching for %d\n", val);
 	if (search_for_node(head, val) != NULL) ? printf("Found it!\n") : printf("Not found!\n");
 	ls_unlock(searchSwitch, noSearcher);
-
 }
 
 /**
