@@ -79,6 +79,7 @@ typedef struct node_t {
  */
 void add_tail(node_t *head, int val){
 	node_t *current = head;
+	if (head != NULL){
 	while (current->next != NULL){
 		current = current->next;
 	}
@@ -86,6 +87,7 @@ void add_tail(node_t *head, int val){
 	current->next->data = val;
 	current->next->next = NULL;
 	list_length++;
+	}
 }
 
 /**
@@ -121,6 +123,7 @@ void remove_node(node_t *head){
 	int j = rand() % list_length;
 	
 	if (j == 0){
+/*
 	    if (head == NULL) {
         	return;
     	}
@@ -128,7 +131,9 @@ void remove_node(node_t *head){
        	temp = (head)->next;
        	free(head);
        	head = temp;
-        return;
+	list_length--;  
+*/  
+    return;
 	}
 
 	else {
@@ -143,6 +148,7 @@ void remove_node(node_t *head){
 		temp = current->next;
 		current->next = temp->next;
 		free(temp);
+		list_length--;
 	}
 
 }
