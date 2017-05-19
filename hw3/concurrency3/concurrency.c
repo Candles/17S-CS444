@@ -145,7 +145,6 @@ void free_list(node_t *head){
 }
 
 
-
 typedef struct {
     int counter;
     sem_t mutex;
@@ -160,8 +159,7 @@ typedef struct {
 void ls_lock(LightSwitch *ls, sem_t *sem){
     sem_wait(&ls->mutex);
     ls->counter++;
-    if (ls->counter == 1)
-    {
+    if (ls->counter == 1) {
         sem_wait(sem);
     }
     sem_post(&ls->mutex);
@@ -177,9 +175,8 @@ void ls_lock(LightSwitch *ls, sem_t *sem){
 void ls_unlock(LightSwitch *ls, sem_t* sem){
     sem_wait(&ls->mutex);
     ls->counter--;
-    if (ls->counter == 0)
-    {
-         sem_post(sem);
+    if (ls->counter == 0) {
+        sem_post(sem);
     }
     sem_post(&ls->mut);
 }
@@ -259,9 +256,11 @@ void *wrok(void* arg){
  * 
  */
 void search(){
+	int val = rand() % 9999;
+
 	ls_lock(searchSwitch, noSearcher);
-	printf("Searching for something!\n");
-	printf("Done searching\n");
+	printf("Searching for %d\n", val);
+	if (search_for_node(head, val) != NULL) ? printf("Found it!\n") : printf("Not found!\n");
 	ls_unlock(searchSwitch, noSearcher);
 
 }
@@ -270,9 +269,11 @@ void search(){
  * @brief      Locks noInserter sem then blocks until it can grab inserMutex.
  */
 void insert(){
+	int val = rand() % 9999;
 	ls_lock(insertSwitch, noInserter);
 	sem_wait(insertMutex); 				//wait for other inserts to finish
-	printf("Inserting!\n");
+	printf("Inserting %d!\n", val);
+	add_tail(head, val);
 	sem_post(insertMutex);
 	ls_unlock(insertSwitch, noInserter);
 }
@@ -283,7 +284,8 @@ void insert(){
 void delete(){
 	sem_wait(noSearcher);
 	sem_wait(noInserter);
-	printf("Deleting!\n");
+	printf("Deleting a node!\n");
+	remove_node(head);
 	sem_post(noInserter);
 	sem_post(noSearcher);
 }
