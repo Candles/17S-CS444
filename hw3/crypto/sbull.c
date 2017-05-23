@@ -1,5 +1,12 @@
-/*
- * Sample disk driver, from the beginning.
+/* sbull.c, originally from https://github.com/martinezjavier/ldd3/blob/master/sbull/sbull.c
+ * adjusted for 3.14.26 kernel with code from https://github.com/duxing2007/ldd3-examples-3.x/blob/master/sbull/sbull.c
+ * 
+ * Basic Ramdisk device with AES-128 encryption
+ * Requires a 16-byte key for proper operation
+ *
+ * By Chongxian Chen, Thomas Olson and Christopher Tang
+ * For CS444 Assignment #3
+ *
  */
 
 #include <linux/module.h>
@@ -22,6 +29,9 @@
 #include <linux/buffer_head.h>	/* invalidate_bdev */
 #include <linux/bio.h>
 
+#include <linux/crypto.h>
+#include <crypto/aes.h>
+
 MODULE_LICENSE("Dual BSD/GPL");
 
 static int sbull_major = 0;
@@ -30,8 +40,12 @@ static int hardsect_size = 512;
 module_param(hardsect_size, int, 0);
 static int nsectors = 1024;	/* How big the drive is */
 module_param(nsectors, int, 0);
-static int ndevices = 4;
+static int ndevices = 1;
 module_param(ndevices, int, 0);
+
+static char *key = "SixAndTenCharKey";
+module_param(key, charp, 0000);
+
 
 /*
  * The different "request modes" we can use.
@@ -78,6 +92,8 @@ struct sbull_dev {
 
 static struct sbull_dev *Devices = NULL;
 
+static struct crypto_cipher *tfm;
+
 /*
  * Handle an I/O request.
  */
@@ -86,15 +102,28 @@ static void sbull_transfer(struct sbull_dev *dev, unsigned long sector,
 {
 	unsigned long offset = sector*KERNEL_SECTOR_SIZE;
 	unsigned long nbytes = nsect*KERNEL_SECTOR_SIZE;
+	unsigned long size = 0;
+	char *ciphbuf = kmalloc(nbytes, GFP_KERNEL);
 
 	if ((offset + nbytes) > dev->size) {
 		printk (KERN_NOTICE "Beyond-end write (%ld %ld)\n", offset, nbytes);
 		return;
 	}
-	if (write)
-		memcpy(dev->data + offset, buffer, nbytes);
-	else
-		memcpy(buffer, dev->data + offset, nbytes);
+
+
+	if (write){
+	    while (size < nbytes){
+		crypto_cipher_encrypt_one(tfm, ciphbuf + size, buffer + size);
+		size += AES_BLOCK_SIZE;
+	    }
+	    memcpy(dev->data + offset, ciphbuf, nbytes);
+	} else {
+	    memcpy(ciphbuf, dev->data + offset, nbytes);
+	    while (size < nbytes - AES_BLOCK_SIZE){
+		crypto_cipher_decrypt_one(tfm, buffer + size, ciphbuf + size);
+		size += AES_BLOCK_SIZE;
+	    }
+	}
 }
 
 /*
@@ -103,21 +132,26 @@ static void sbull_transfer(struct sbull_dev *dev, unsigned long sector,
 static void sbull_request(struct request_queue *q)
 {
 	struct request *req;
+	int ret;
 
-	while ((req = blk_fetch_request(q)) != NULL) {
+	req = blk_fetch_request(q);
+	while (req) {
 		struct sbull_dev *dev = req->rq_disk->private_data;
 		if (req->cmd_type != REQ_TYPE_FS) {
 			printk (KERN_NOTICE "Skip non-fs request\n");
-			__blk_end_request_cur(req, -EIO);
-			continue;
+			ret = -EIO;
+			goto done;
 		}
-    //    	printk (KERN_NOTICE "Req dev %d dir %ld sec %ld, nr %d f %lx\n",
-    //    			dev - Devices, rq_data_dir(req),
-    //    			req->sector, req->current_nr_sectors,
-    //    			req->flags);
+/*		printk (KERN_NOTICE "Req dev %u dir %d sec %ld, nr %d\n",
+			(unsigned)(dev - Devices), rq_data_dir(req),
+			blk_rq_pos(req), blk_rq_cur_sectors(req));	*/
 		sbull_transfer(dev, blk_rq_pos(req), blk_rq_cur_sectors(req),
-				req->buffer, rq_data_dir(req));
-		__blk_end_request_cur(req, 0);
+				bio_data(req->bio), rq_data_dir(req));
+		ret = 0;
+	done:
+		if(!__blk_end_request_cur(req, ret)){
+			req = blk_fetch_request(q);
+		}
 	}
 }
 
@@ -127,17 +161,17 @@ static void sbull_request(struct request_queue *q)
  */
 static int sbull_xfer_bio(struct sbull_dev *dev, struct bio *bio)
 {
-	int i;
-	struct bio_vec *bvec;
-	sector_t sector = bio->bi_sector;
+	struct bio_vec bvec;
+	struct bvec_iter iter;
+	sector_t sector = bio->bi_iter.bi_sector;
 
 	/* Do each segment independently. */
-	bio_for_each_segment(bvec, bio, i) {
-		char *buffer = __bio_kmap_atomic(bio, i, KM_USER0);
+	bio_for_each_segment(bvec, bio, iter) {
+		char *buffer = __bio_kmap_atomic(bio, iter);
 		sbull_transfer(dev, sector, bio_cur_bytes(bio) >> 9,
 				buffer, bio_data_dir(bio) == WRITE);
 		sector += bio_cur_bytes(bio) >> 9;
-		__bio_kunmap_atomic(buffer, KM_USER0);
+		__bio_kunmap_atomic(bio);
 	}
 	return 0; /* Always "succeed" */
 }
@@ -152,7 +186,7 @@ static int sbull_xfer_request(struct sbull_dev *dev, struct request *req)
     
 	__rq_for_each_bio(bio, req) {
 		sbull_xfer_bio(dev, bio);
-		nsect += bio->bi_size/KERNEL_SECTOR_SIZE;
+		nsect += bio->bi_iter.bi_size/KERNEL_SECTOR_SIZE;
 	}
 	return nsect;
 }
@@ -165,17 +199,19 @@ static int sbull_xfer_request(struct sbull_dev *dev, struct request *req)
 static void sbull_full_request(struct request_queue *q)
 {
 	struct request *req;
-	int sectors_xferred;
 	struct sbull_dev *dev = q->queuedata;
+	int ret;
 
 	while ((req = blk_fetch_request(q)) != NULL) {
 		if (req->cmd_type != REQ_TYPE_FS) {
 			printk (KERN_NOTICE "Skip non-fs request\n");
-			__blk_end_request(req, -EIO, blk_rq_cur_bytes(req));
-			continue;
+			ret = -EIO;
+			goto done;
 		}
-		sectors_xferred = sbull_xfer_request(dev, req);
-		__blk_end_request(req, 0, sectors_xferred);
+		sbull_xfer_request(dev, req);
+		ret = 0;
+	done:
+		__blk_end_request_all(req, ret);
 	}
 }
 
@@ -396,6 +432,17 @@ static void setup_device(struct sbull_dev *dev, int which)
 static int __init sbull_init(void)
 {
 	int i;
+	int err;
+	
+	/*
+	 * Initialize crypto transform
+	 */
+	tfm = crypto_alloc_cipher("aes", 0, 0);
+	
+	err = crypto_cipher_setkey(tfm, key, 16);
+	if (err)
+	    printk("Error setting key for cipher!");
+
 	/*
 	 * Get registered.
 	 */
@@ -412,9 +459,9 @@ static int __init sbull_init(void)
 		goto out_unregister;
 	for (i = 0; i < ndevices; i++) 
 		setup_device(Devices + i, i);
-    
-	return 0;
 
+	return 0;
+		
   out_unregister:
 	unregister_blkdev(sbull_major, "sbd");
 	return -ENOMEM;
@@ -434,13 +481,16 @@ static void sbull_exit(void)
 		}
 		if (dev->queue) {
 			if (request_mode == RM_NOQUEUE)
-				kobject_put (&dev->queue->kobj);
+				blk_put_queue(dev->queue);
 			else
 				blk_cleanup_queue(dev->queue);
 		}
 		if (dev->data)
 			vfree(dev->data);
 	}
+	
+	crypto_free_cipher(tfm);
+	
 	unregister_blkdev(sbull_major, "sbull");
 	kfree(Devices);
 }

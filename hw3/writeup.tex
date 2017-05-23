@@ -75,22 +75,23 @@
 \end{titlepage}
 
 \section{Design}
-
-We plan on implementing the C-LOOK algorithm, as it seems to be the easier of the two options. After some research, it appears that the I/O elevator already preforms back-merging, so we do not have to implement that ourselves.
+We used an open-source implementation of the SBULL device for our RAMdisk, as the assignment did not require us to create a device driver ourselves. After researching the assorted options for algorithms, we opted for AES as the implementation for it is relatively simple. Additionally, we decided to use a single block-cipher rather than a multi-block cipher to simplify the encryption/decryption code, as a multi-block cipher requires the use of scatterlists to work. We chose to implement the encryption/decryption calls in the transfer function, right before and after the data is written to or read from the block device, so that we would not have to handle the encrypted data outside of the transfer function. Finally, because AES uses a blocksize of 16 bytes, all transfers are in multiples of 512 bytes, and 16 is a divisor of 512, we don't need to worry about padding to encrypt any number of bytes that isn't a multiple of the AES blocksize.
 
 \section{Questions}
 
 \subsection{Main point of assignment}
-
+We believe the main point of this assignment was to practice using an API that has very little documentation. The crypto API is very important and used in a number of places, but information on it is few and far between. No single source provided the answers we needed, so the best information we got was actually usage examples from other parts of the kernel. 
 
 \subsection{How we approached the problem}
+We started by getting a working sbull device driver that would allow us to read and write files from and to it. The examples that we found were all for kernel versions either newer or older than the 3.14.26 kernel, so we took some code from two separate implementations and combined them to get a working driver. Then we worked to get the cryptography implementation working; the two files that were the most useful were the cryptoloop.c file and the aes\_cmac.c file, which is part of the Linux mac80211 subsystem. We used the usage from cryptoloop to figure out how initialization works, but it didn't help us figure out encryption. Looking through the crypto code lead us to the AES implementation, which took us to the mac80211 system that used AES in single-block mode; we used that code as the basis for our implementation. Originally, we assumed we'd need to handle padding, but we realized that all transfers were in multiples of 512 bytes, which is a multiple of the AES block size of 16 bytes.
 
+Once we had all those figured out, we implemented the actual encryption and decryption. There were two major bugs: one was having the crypto initialization too late in the sbull init function, which caused a null pointer error as the init function does a transfer to try and pull partition information from the sbull device. The other was simply missing a return statement, which caused issues when implementing it as a loadable kernel module. Once those two were fixed, we then added the key as a module parameter and did some final testing on the device to verify full functionality.
 
 \subsection{How We Tested Our Solution}
-
+Testing consisted of logging all data read and written to a local file, both the plaintext and the ciphertext. We then read and wrote files containing certain patterns to the device so that we could check the log for these patterns. We verified that the patterns appeared in the plaintext bytes written and read and not the encrypted bytes.
 
 \subsection{What we learned}
-
+The biggest thing we learned was how to pull disparate pieces of information together as a form of ad hoc documentation for a poorly documented but widely used API. We also learned a bit about how the cryptography API works and how to implement loadable kernel modules; specifically, how to create module parameters.
 
 
 \section{Git Log}
@@ -98,7 +99,11 @@ We plan on implementing the C-LOOK algorithm, as it seems to be the easier of th
 
 
 \section{Work Log}
+\subsection{May 21st}
+Worked on implementing the sbull device driver and did most of the cryptography implementation
 
+\subsection{May 22nd}
+Finished implementing and testing the cryptography implementation; converted the code into a loadable kernel module with entering a key as a module parameter
 
 \end{document}
 
