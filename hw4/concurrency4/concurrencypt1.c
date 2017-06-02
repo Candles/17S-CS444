@@ -20,7 +20,7 @@ sem_t              maleMultiplex;      ///<Male counter*/
 sem_t              femaleMultiplex;    ///<Female counter*/
 sem_t              noMale;             ///<Locked by female to block male entry
 sem_t              noFemale;           ///<Locked by male to block female entry
-
+sem_t              gate;               ///<Gate blocking threads leaving*/
 
 
 /**
@@ -54,6 +54,23 @@ void ls_unlock(lightswitch *ls, sem_t* sem){
     sem_post(&ls->mutex);
 }
 
+void turnstile(lightswitch *ls, sem_t* sem){
+    sem_wait(&ls->mutex);
+    ls->counter++;
+    if (ls->counter == 1){
+        sem_wait(sem);  //lock the gate
+        while (ls->counter != 3){
+        }
+        sem_post(sem);
+    }
+    else {
+        sem_wait(sem);
+        sem_post(sem);
+    }
+}
+
+
+
 void is_man();
 void is_woman();
 
@@ -65,6 +82,8 @@ void is_woman();
 
 struct lightswitch maleSwitch;         ///<Males only lock*/
 struct lightswitch femaleSwitch;       ///<Females only lock*/
+struct lightswitch gatelock;
+    
 /******************************************************************************
  *************************************** Main *********************************
  ******************************************************************************/
@@ -87,7 +106,7 @@ int main(int argc, char const *argv[]){
 
     // spawn males
     for (i = 0; i < max; i++){
-        if(rand() % 2){
+        if(1){
             males++;
             printf("Creating MALE: %d\n", males);
             pthread_create(&threads[i], NULL, (void*)is_man, NULL);
@@ -126,7 +145,10 @@ void is_man(){
     // take care of business
     printf("Male in\n");
     sleep(rand() % 5 + 2);
+
+    turnstile(&gatelock, &gate);
     printf("Male out\n");
+
 
     sem_post(&maleMultiplex);           // done using bathroom
     ls_unlock(&maleSwitch, &noFemale);   // exit bathroom
