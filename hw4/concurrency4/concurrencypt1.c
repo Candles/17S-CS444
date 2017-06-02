@@ -15,13 +15,21 @@ typedef struct lightswitch {
 } lightswitch;
 
 
+sem_t              empty;              ///<High when bathroom empty*/
+sem_t              maleMultiplex;      ///<Male counter*/
+sem_t              femaleMultiplex;    ///<Female counter*/
+sem_t              noMale;             ///<Locked by female to block male entry
+sem_t              noFemale;           ///<Locked by male to block female entry
+
+
+
 /**
  * @brief      Multi-thread semaphore controller - LOCK
  *
  * @param      ls    Pointer to LightSwitch struct
  * @param      sem   The semaphore to be locked
  */
-void ls_lock(LightSwitch *ls, sem_t *sem){
+void ls_lock(lightswitch *ls, sem_t *sem){
     sem_wait(&ls->mutex);
     ls->counter++;
     if (ls->counter == 1) {
@@ -34,10 +42,10 @@ void ls_lock(LightSwitch *ls, sem_t *sem){
 /**
  * @brief      Multi-thread semaphore controller - UNLOCK
  *
- * @param      ls    Pointer to LightSwitch struct
+ * @param      ls    Pointer to lightswitch struct
  * @param      sem   The semaphore to be unlocked
  */
-void ls_unlock(LightSwitch *ls, sem_t* sem){
+void ls_unlock(lightswitch *ls, sem_t* sem){
     sem_wait(&ls->mutex);
     ls->counter--;
     if (ls->counter == 0) {
@@ -46,53 +54,8 @@ void ls_unlock(LightSwitch *ls, sem_t* sem){
     sem_post(&ls->mutex);
 }
 
-
-/**
- * @brief      Male thread execution
- */
-void is_man(){
-    sem_wait(&empty);   // get in line
-    
-    sem_wait(&noMale);  // make sure female haven't locked the bathroom
-    ls_lock(&maleSwitch, &noFemale) // block female entry
-    sem_post(&noMale);  // let another guy check if bathroom is available
-    
-    sem_post(&empty);  // get out of line
-
-    sem_wait(&maleMultiplex);   /// Wait if too many men in bathroom
-    
-    // take care of business
-    printf("Male in\n");
-    sleep(rand() % 8 + 2);
-    printf("Male out\n");
-
-    sem_post(&maleMultiplex); // done using bathroom
-    ls_unlock(maleSwitch, &noFemale); // exit bathroom
-}
-
-
-/**
- * @brief      Female thread execution
- */
-void is_woman(){
-    sem_wait(&empty);   // get in line
-    
-    sem_wait(&noFemale);  // make sure male haven't locked the bathroom
-    ls_lock(&femaleSwitch, &noMale) // block male entry
-    sem_post(&noFemale);  // let another guy check if bathroom is available
-    
-    sem_post(&empty);  // get out of line
-
-    sem_wait(&femaleMultiplex);   /// Wait if too many women in bathroom
-    
-    // take care of business
-    printf("Female in\n");
-    sleep(rand() % 8 + 4);
-    printf("Female out\n");
-
-    sem_post(&femaleMultiplex); // done using bathroom
-    ls_unlock(femaleSwitch, &noMale); // exit bathroom
-}
+void is_man();
+void is_woman();
 
 
 
@@ -101,19 +64,11 @@ void is_woman(){
 #define MALE    10;
 #define FEMALE  10;
 
-
+struct lightswitch maleSwitch;         ///<Males only lock*/
+struct lightswitch femaleSwitch;       ///<Females only lock*/
 /******************************************************************************
  *************************************** Main *********************************
  ******************************************************************************/
-
-
-sem_t       empty;              ///<High when bathroom empty*/
-sem_t       maleMultiplex;      ///<Male counter*/
-sem_t       femaleMultiplex;    ///<Female counter*/
-sem_t       noMale;            ///<Locked by female to block male entry
-sem_t       noFemale;           ///<Locked by male to block female entry
-lightswitch maleSwitch;         ///<Males only lock*/
-lightswitch femaleSwitch;       ///<Females only lock*/
 
 int main(int argc, char const *argv[]){
     sem_init(&empty, 0, 1);
@@ -131,13 +86,13 @@ int main(int argc, char const *argv[]){
     threads = malloc( sizeof(pthread_t) * maxthreads );
 
     // spawn males
-    for (;i < MALE; i++){
-        pthread_create(&threads[i], NULL, is_man, NULL);
+    for (i = 0; i < 10; i++){
+        pthread_create(&threads[i], NULL, (void*)is_man, NULL);
     }
 
     // spawn females
-    for (; i < maxthreads; i++){
-        pthread_create(&threads[i], NULL, is_woman, NULL);
+    for (i; i < maxthreads; i++){
+        pthread_create(&threads[i], NULL, (void*)is_woman, NULL);
     }
 
     // catch any threads that close
@@ -146,4 +101,52 @@ int main(int argc, char const *argv[]){
     }
 
     return 0;
+}
+
+
+/**
+ * @brief      Male thread execution
+ */
+void is_man(){
+    sem_wait(&empty);                   // get in line
+    
+    sem_wait(&noMale);                  // make sure female haven't locked the bathroom
+    ls_lock(&maleSwitch, &noFemale);    // block female entry
+    sem_post(&noMale);                  // let another guy check if bathroom is available
+    
+    sem_post(&empty);                   // get out of line
+
+    sem_wait(&maleMultiplex);           // Wait if too many men in bathroom
+    
+    // take care of business
+    printf("Male in\n");
+    sleep(rand() % 8 + 2);
+    printf("Male out\n");
+
+    sem_post(&maleMultiplex);           // done using bathroom
+    ls_unlock(&maleSwitch, &noFemale);   // exit bathroom
+}
+
+
+/**
+ * @brief      Female thread execution
+ */
+void is_woman(){
+    sem_wait(&empty);                   // get in line
+    
+    sem_wait(&noFemale);                // make sure male haven't locked the bathroom
+    ls_lock(&femaleSwitch, &noMale);    // block male entry
+    sem_post(&noFemale);                // let another guy check if bathroom is available
+    
+    sem_post(&empty);                   // get out of line
+
+    sem_wait(&femaleMultiplex);         // Wait if too many women in bathroom
+    
+    // take care of business
+    printf("Female in\n");
+    sleep(rand() % 8 + 4);
+    printf("Female out\n");
+
+    sem_post(&femaleMultiplex);         // done using bathroom
+    ls_unlock(&femaleSwitch, &noMale);   // exit bathroom
 }
