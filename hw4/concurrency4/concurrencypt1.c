@@ -15,6 +15,14 @@ typedef struct lightswitch {
 } lightswitch;
 
 
+typedef struct turnstile {
+    int counter;
+    int max;
+    sem_t mutex;
+    sem_t turn1;
+    sem_t turn2;
+} turnstile;
+
 sem_t              empty;              ///<High when bathroom empty*/
 sem_t              maleMultiplex;      ///<Male counter*/
 sem_t              femaleMultiplex;    ///<Female counter*/
@@ -54,21 +62,39 @@ void ls_unlock(lightswitch *ls, sem_t* sem){
     sem_post(&ls->mutex);
 }
 
-void turnstile(lightswitch *ls, sem_t* sem){
+void turnstile_phase1(turnstile *ls){
     sem_wait(&ls->mutex);
     ls->counter++;
-    if (ls->counter == 1){
-        sem_wait(sem);  //lock the gate
-        while (ls->counter != 3){
-        }
-        sem_post(sem);
+    printf("%d\n", ls->counter);
+    if (ls->counter == 3){
+        // printf("posting turn1\n");
+        sem_post(&ls->turn1);  //lock the gate
+        sem_post(&ls->turn1);  //lock the gate
+        sem_post(&ls->turn1);  //lock the gate
+
     }
-    else {
-        sem_wait(sem);
-        sem_post(sem);
-    }
+        sem_post(&ls->mutex);
+        sem_wait(&ls->turn1);
+        // printf("leaving phase 1\n");
 }
 
+void turnstile_phase2(turnstile *ls){
+    sem_wait(&ls->mutex);
+    ls->counter--;
+    // printf("in phase2 %d\n", ls->counter);
+    if(ls->counter == 0){
+        sem_post(&ls->turn2);
+        sem_post(&ls->turn2);
+        sem_post(&ls->turn2);
+    }
+    sem_post(&ls->mutex);
+    sem_wait(&ls->turn2);
+}
+
+void turnstile_wait(turnstile *ls){
+    turnstile_phase1(ls);
+    turnstile_phase2(ls);
+}
 
 
 void is_man();
@@ -82,7 +108,7 @@ void is_woman();
 
 struct lightswitch maleSwitch;         ///<Males only lock*/
 struct lightswitch femaleSwitch;       ///<Females only lock*/
-struct lightswitch gatelock;
+struct turnstile   gatelock;
     
 /******************************************************************************
  *************************************** Main *********************************
@@ -96,6 +122,13 @@ int main(int argc, char const *argv[]){
     sem_init(&femaleMultiplex, 0, 3);
     sem_init(&maleSwitch.mutex, 0, 1);
     sem_init(&femaleSwitch.mutex, 0, 1);
+
+    sem_init(&gatelock.mutex, 0, 1);
+    sem_init(&gatelock.turn1, 0, 0);
+    sem_init(&gatelock.turn2, 0, 0);
+    gatelock.max = 3;
+    gatelock.counter = 0;
+
 
     int i = 0;
     int max =  MAXTHREADS
@@ -143,11 +176,11 @@ void is_man(){
     sem_wait(&maleMultiplex);           // Wait if too many men in bathroom
     
     // take care of business
-    printf("Male in\n");
+    printf("Going in bathroom\n");
     sleep(rand() % 5 + 2);
-
-    turnstile(&gatelock, &gate);
-    printf("Male out\n");
+    printf("Washing hands\n");
+    turnstile_wait(&gatelock);
+    printf("Out of bathroom\n");
 
 
     sem_post(&maleMultiplex);           // done using bathroom
