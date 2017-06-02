@@ -87,7 +87,7 @@ int main(int argc, char const *argv[]){
 
     // spawn males
     for (i = 0; i < max; i++){
-        if(rand() % 1){
+        if(rand() % 2){
             males++;
             printf("Creating MALE: %d\n", males);
             pthread_create(&threads[i], NULL, (void*)is_man, NULL);
