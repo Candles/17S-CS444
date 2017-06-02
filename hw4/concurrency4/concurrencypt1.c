@@ -113,7 +113,7 @@ int main(int argc, char const *argv[]){
  */
 void is_man(){
     while(1){
-    sem_wait(&empty);                   // get in line
+   // sem_wait(&empty);                   // get in line
     
     sem_wait(&noMale);                  // make sure female haven't locked the bathroom
     ls_lock(&maleSwitch, &noFemale);    // block female entry
@@ -125,11 +125,13 @@ void is_man(){
     
     // take care of business
     printf("Male in\n");
-    sleep(rand() % 8 + 2);
+    sleep(rand() % 5 + 2);
     printf("Male out\n");
 
     sem_post(&maleMultiplex);           // done using bathroom
     ls_unlock(&maleSwitch, &noFemale);   // exit bathroom
+    
+    sleep(rand() % 20 + 5); // don't have to use bathroom for a while
     }
 }
 
@@ -139,7 +141,7 @@ void is_man(){
  */
 void is_woman(){
     while(1){
-    sem_wait(&empty);                   // get in line
+//    sem_wait(&empty);                   // get in line
     
     sem_wait(&noFemale);                // make sure male haven't locked the bathroom
     ls_lock(&femaleSwitch, &noMale);    // block male entry
@@ -151,10 +153,12 @@ void is_woman(){
     
     // take care of business
     printf("Female in\n");
-    sleep(rand() % 8 + 4);
+    sleep(rand() % 5 + 2);
     printf("Female out\n");
 
     sem_post(&femaleMultiplex);         // done using bathroom
     ls_unlock(&femaleSwitch, &noMale);   // exit bathroom
+    
+    sleep(rand() % 20 + 5);
     }
 }
